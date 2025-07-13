@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPUOptimizer Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+        }
+
+        .sidebar h2 {
+            margin-bottom: 30px;
+            font-size: 1.5rem;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+        }
+
+        .sidebar nav li {
+            margin-bottom: 15px;
+        }
+
+        .sidebar nav a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 15px;
+            display: block;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+
+        .sidebar nav a:hover, .sidebar nav a.active {
+            background: #34495e;
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            color: #2c3e50;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h3 {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-card .change {
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .change.positive {
+            color: #27ae60;
+        }
+
+        .change.negative {
+            color: #e74c3c;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .chart-container h3 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+
+        .gpu-list {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .gpu-list h3 {
+            padding: 20px;
+            background: #34495e;
+            color: white;
+            margin: 0;
+        }
+
+        .gpu-item {
+            padding: 20px;
+            border-bottom: 1px solid #ecf0f1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .gpu-item:last-child {
+            border-bottom: none;
+        }
+
+        .gpu-info h4 {
+            margin-bottom: 5px;
+            color: #2c3e50;
+        }
+
+        .gpu-info p {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+
+        .gpu-stats {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .utilization-bar {
+            width: 100px;
+            height: 8px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .utilization-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #27ae60, #f39c12, #e74c3c);
+            transition: width 0.3s;
+        }
+
+        .status {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .status.idle {
+            background: #e8f5e8;
+            color: #27ae60;
+        }
+
+        .status.active {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.overloaded {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+        }
+
+        .btn.primary {
+            background: #27ae60;
+        }
+
+        .btn.primary:hover {
+            background: #229954;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                display: none;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .gpu-stats {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <aside class="sidebar">
+            <h2>GPUOptimizer</h2>
+            <nav>
+                <ul>
+                    <li><a href="#overview" class="active">Overview</a></li>
+                    <li><a href="#gpus">GPU Monitoring</a></li>
+                    <li><a href="#analytics">Analytics</a></li>
+                    <li><a href="#alerts">Alerts</a></li>
+                    <li><a href="#billing">Billing</a></li>
+                    <li><a href="#settings">Settings</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <h1>Dashboard Overview</h1>
+                <div class="user-info">
+                    <span id="userEmail">user@example.com</span>
+                    <span id="userTier" class="btn">Professional</span>
+                </div>
+            </header>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Monthly Savings</h3>
+                    <div class="value" id="monthlySavings">$2,847</div>
+                    <div class="change positive">+23% from last month</div>
+                </div>
+
+                <div class="stat-card">
+                    <h3>GPUs Monitored</h3>
+                    <div class="value" id="gpuCount">8</div>
+                    <div class="change positive">+2 this week</div>
+                </div>
+
+                <div class="stat-card">
+                    <h3>Average Utilization</h3>
+                    <div class="value" id="avgUtilization">67%</div>
+                    <div class="change negative">-5% from last week</div>
+                </div>
+
+                <div class="stat-card">
+                    <h3>Cost Per Hour</h3>
+                    <div class="value" id="costPerHour">$18.40</div>
+                    <div class="change positive">-$4.20 optimized</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3>GPU Utilization Over Time</h3>
+                <canvas id="utilizationChart" width="800" height="300"></canvas>
+            </div>
+
+            <div class="gpu-list">
+                <h3>Active GPUs</h3>
+                <div id="gpuListContainer">
+                    <!-- GPU items will be populated by JavaScript -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Sample GPU data
+        const gpuData = [
+            {
+                name: "Tesla V100",
+                index: 0,
+                utilization: 85,
+                memory: 75,
+                temperature: 72,
+                status: "active",
+                costPerHour: 3.06
+            },
+            {
+                name: "Tesla V100",
+                index: 1,
+                utilization: 12,
+                memory: 15,
+                temperature: 45,
+                status: "idle",
+                costPerHour: 3.06
+            },
+            {
+                name: "RTX 3090",
+                index: 2,
+                utilization: 95,
+                memory: 88,
+                temperature: 78,
+                status: "overloaded",
+                costPerHour: 1.50
+            },
+            {
+                name: "Tesla T4",
+                index: 3,
+                utilization: 45,
+                memory: 32,
+                temperature: 58,
+                status: "active",
+                costPerHour: 0.526
+            }
+        ];
+
+        function renderGPUList() {
+            const container = document.getElementById('gpuListContainer');
+            container.innerHTML = '';
+
+            gpuData.forEach(gpu => {
+                const gpuItem = document.createElement('div');
+                gpuItem.className = 'gpu-item';
+                
+                gpuItem.innerHTML = `
+                    <div class="gpu-info">
+                        <h4>${gpu.name} (GPU ${gpu.index})</h4>
+                        <p>Temperature: ${gpu.temperature}°C | Cost: $${gpu.costPerHour}/hour</p>
+                    </div>
+                    <div class="gpu-stats">
+                        <div>
+                            <small>Utilization</small>
+                            <div class="utilization-bar">
+                                <div class="utilization-fill" style="width: ${gpu.utilization}%"></div>
+                            </div>
+                            <small>${gpu.utilization}%</small>
+                        </div>
+                        <div>
+                            <small>Memory</small>
+                            <div class="utilization-bar">
+                                <div class="utilization-fill" style="width: ${gpu.memory}%"></div>
+                            </div>
+                            <small>${gpu.memory}%</small>
+                        </div>
+                        <span class="status ${gpu.status}">${gpu.status.toUpperCase()}</span>
+                    </div>
+                `;
+                
+                container.appendChild(gpuItem);
+            });
+        }
+
+        function drawChart() {
+            const canvas = document.getElementById('utilizationChart');
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Sample data for the last 24 hours
+            const hours = [];
+            const utilization = [];
+            
+            for (let i = 23; i >= 0; i--) {
+                hours.push(`${i}h ago`);
+                utilization.push(Math.random() * 100);
+            }
+            
+            // Draw axes
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+            
+            // Y-axis
+            ctx.beginPath();
+            ctx.moveTo(50, 20);
+            ctx.lineTo(50, 250);
+            ctx.stroke();
+            
+            // X-axis
+            ctx.beginPath();
+            ctx.moveTo(50, 250);
+            ctx.lineTo(750, 250);
+            ctx.stroke();
+            
+            // Draw utilization line
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            utilization.forEach((value, index) => {
+                const x = 50 + (index * (700 / 23));
+                const y = 250 - (value * 2.3); // Scale to fit chart
+                
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            
+            ctx.stroke();
+            
+            // Add labels
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Arial';
+            ctx.fillText('GPU Utilization %', 10, 140);
+            ctx.fillText('Time', 400, 280);
+        }
+
+        function updateStats() {
+            // Simulate real-time updates
+            const avgUtil = gpuData.reduce((sum, gpu) => sum + gpu.utilization, 0) / gpuData.length;
+            document.getElementById('avgUtilization').textContent = Math.round(avgUtil) + '%';
+            
+            const totalCost = gpuData.reduce((sum, gpu) => sum + gpu.costPerHour, 0);
+            document.getElementById('costPerHour').textContent = '$' + totalCost.toFixed(2);
+            
+            document.getElementById('gpuCount').textContent = gpuData.length;
+        }
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            renderGPUList();
+            drawChart();
+            updateStats();
+            
+            // Simulate real-time updates every 30 seconds
+            setInterval(() => {
+                // Randomly update GPU utilization
+                gpuData.forEach(gpu => {
+                    gpu.utilization = Math.max(0, Math.min(100, 
+                        gpu.utilization + (Math.random() - 0.5) * 20
+                    ));
+                    
+                    // Update status based on utilization
+                    if (gpu.utilization < 20) {
+                        gpu.status = 'idle';
+                    } else if (gpu.utilization > 90) {
+                        gpu.status = 'overloaded';
+                    } else {
+                        gpu.status = 'active';
+                    }
+                });
+                
+                renderGPUList();
+                updateStats();
+                drawChart();
+            }, 30000);
+        });
+
+        // Navigation handling
+        document.querySelectorAll('.sidebar nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Remove active class from all links
+                document.querySelectorAll('.sidebar nav a').forEach(l => l.classList.remove('active'));
+                
+                // Add active class to clicked link
+                this.classList.add('active');
+                
+                // Update header based on selection
+                const section = this.getAttribute('href').substring(1);
+                document.querySelector('.header h1').textContent = 
+                    section.charAt(0).toUpperCase() + section.slice(1);
+            });
+        });
+    </script>
+</body>
+</html>
+

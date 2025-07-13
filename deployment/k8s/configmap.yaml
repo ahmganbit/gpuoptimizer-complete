@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpuoptimizer-config
+  namespace: gpuoptimizer
+data:
+  FLASK_ENV: "production"
+  DATABASE_URL: "postgresql://gpuopt:$(DB_PASSWORD)@postgres-service:5432/gpuoptimizer"
+  REDIS_URL: "redis://redis-service:6379/0"
+  DOMAIN: "gpuoptimizer.ai"
+  
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gpuoptimizer-secrets
+  namespace: gpuoptimizer
+type: Opaque
+stringData:
+  SECRET_KEY: "your-secret-key-here"
+  ENCRYPTION_KEY: "your-encryption-key-here"
+  DB_PASSWORD: "your-db-password-here"
+  REDIS_PASSWORD: "your-redis-password-here"
+  FLUTTERWAVE_SECRET_KEY: "your-flutterwave-secret-key"
+  FLUTTERWAVE_PUBLIC_KEY: "your-flutterwave-public-key"
+  NOWPAYMENTS_API_KEY: "your-nowpayments-api-key"
+  NOWPAYMENTS_IPN_SECRET: "your-nowpayments-ipn-secret"
+  SENDER_EMAIL: "your-sender-email"
+  SENDER_PASSWORD: "your-sender-password"
+  GRAFANA_PASSWORD: "your-grafana-password"

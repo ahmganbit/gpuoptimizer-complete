@@ -1,0 +1,106 @@
+# Development and Testing Requirements for GPUOptimizer
+# Install with: pip install -r requirements-dev.txt
+
+# Include production requirements
+-r requirements.txt
+
+# =============================================================================
+# TESTING FRAMEWORK
+# =============================================================================
+pytest==8.2.2                    # Testing framework
+pytest-cov==5.0.0               # Coverage reporting
+pytest-mock==3.14.0             # Mocking utilities
+pytest-asyncio==0.23.7          # Async testing support
+pytest-xdist==3.6.0             # Parallel test execution
+pytest-timeout==2.3.1           # Test timeout handling
+pytest-benchmark==4.0.0         # Performance benchmarking
+pytest-html==4.1.1              # HTML test reports
+pytest-json-report==1.5.0       # JSON test reports
+
+# =============================================================================
+# CODE QUALITY AND FORMATTING
+# =============================================================================
+black==24.4.2                   # Code formatting
+isort==5.13.2                   # Import sorting
+flake8==7.1.0                   # Linting
+flake8-docstrings==1.7.0        # Docstring linting
+flake8-import-order==0.18.2     # Import order checking
+flake8-bugbear==24.4.26         # Additional bug detection
+mypy==1.10.1                    # Type checking
+bandit==1.7.9                   # Security linting
+
+# =============================================================================
+# PRE-COMMIT HOOKS
+# =============================================================================
+pre-commit==3.7.1               # Git hooks framework
+
+# =============================================================================
+# DOCUMENTATION
+# =============================================================================
+sphinx==7.3.7                   # Documentation generation
+sphinx-rtd-theme==2.0.0         # ReadTheDocs theme
+sphinx-autodoc-typehints==2.2.2 # Type hints in docs
+
+# =============================================================================
+# SECURITY TESTING
+# =============================================================================
+safety==3.2.3                   # Dependency vulnerability scanning
+semgrep==1.78.0                 # Static analysis security scanner
+
+# =============================================================================
+# PERFORMANCE TESTING
+# =============================================================================
+locust==2.29.1                  # Load testing framework
+memory-profiler==0.61.0         # Memory usage profiling
+py-spy==0.3.14                  # Python profiler
+
+# =============================================================================
+# DATABASE TESTING
+# =============================================================================
+factory-boy==3.3.0              # Test data generation
+faker==25.8.0                   # Fake data generation
+
+# =============================================================================
+# API TESTING
+# =============================================================================
+httpx==0.27.0                   # HTTP client for testing
+responses==0.25.3               # HTTP request mocking
+
+# =============================================================================
+# DEBUGGING AND DEVELOPMENT
+# =============================================================================
+ipdb==0.13.13                   # Enhanced debugger
+ipython==8.25.0                 # Enhanced Python shell
+jupyter==1.0.0                  # Jupyter notebooks for analysis
+
+# =============================================================================
+# CONTINUOUS INTEGRATION
+# =============================================================================
+tox==4.15.1                     # Testing across Python versions
+coverage==7.5.4                 # Coverage measurement
+
+# =============================================================================
+# MOCK AND FIXTURES
+# =============================================================================
+freezegun==1.5.1                # Time mocking
+responses==0.25.3               # HTTP response mocking
+pytest-factoryboy==2.7.0        # Factory integration with pytest
+
+# =============================================================================
+# ENVIRONMENT MANAGEMENT
+# =============================================================================
+python-dotenv==1.0.1            # Environment variable management
+environs==11.0.0                # Environment parsing
+
+# =============================================================================
+# REPORTING AND METRICS
+# =============================================================================
+pytest-clarity==1.0.1           # Better test failure output
+pytest-sugar==1.0.0             # Better test output formatting
+
+# =============================================================================
+# COMPATIBILITY NOTES
+# =============================================================================
+# This requirements-dev.txt is compatible with Python 3.11+
+# For CI/CD environments, consider pinning exact versions
+# Run `pip-compile requirements-dev.in` to generate locked versions

@@ -1,0 +1,160 @@
+# =============================================================================
+# GPUOptimizer Revenue System - Docker Compose Configuration
+# Complete production deployment with all services
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # Main application service
+  gpu-optimizer:
+    build: .
+    container_name: gpu-optimizer-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # Load from .env file
+      - FLUTTERWAVE_SECRET_KEY=${FLUTTERWAVE_SECRET_KEY}
+      - FLUTTERWAVE_PUBLIC_KEY=${FLUTTERWAVE_PUBLIC_KEY}
+      - NOWPAYMENTS_API_KEY=${NOWPAYMENTS_API_KEY}
+      - NOWPAYMENTS_IPN_SECRET=${NOWPAYMENTS_IPN_SECRET}
+      - NOWPAYMENTS_SANDBOX=${NOWPAYMENTS_SANDBOX:-true}
+      - SENDER_EMAIL=${SENDER_EMAIL}
+      - SENDER_PASSWORD=${SENDER_PASSWORD}
+      - SMTP_SERVER=${SMTP_SERVER:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID}
+      - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
+      - TWITTER_BEARER_TOKEN=${TWITTER_BEARER_TOKEN}
+      - BASE_URL=${BASE_URL:-http://localhost:5000}
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///data/revenue.db}
+      - LEADS_DATABASE_URL=${LEADS_DATABASE_URL:-sqlite:///data/leads.db}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENABLE_ACQUISITION=${ENABLE_ACQUISITION:-true}
+      - ENABLE_EMAIL_NOTIFICATIONS=${ENABLE_EMAIL_NOTIFICATIONS:-true}
+      - ENABLE_WEBHOOKS=${ENABLE_WEBHOOKS:-true}
+      - ENABLE_GPU_MONITORING=${ENABLE_GPU_MONITORING:-true}
+    volumes:
+      - gpu_optimizer_data:/app/data
+      - gpu_optimizer_logs:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - gpu_optimizer_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for rate limiting and caching
+  redis:
+    image: redis:7-alpine
+    container_name: gpu-optimizer-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - gpu_optimizer_network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  # PostgreSQL database (optional, for production)
+  postgres:
+    image: postgres:15-alpine
+    container_name: gpu-optimizer-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-gpu_optimizer}
+      - POSTGRES_USER=${POSTGRES_USER:-gpu_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - gpu_optimizer_network
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: gpu-optimizer-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - gpu-optimizer
+    networks:
+      - gpu_optimizer_network
+
+  # Monitoring with Prometheus (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: gpu-optimizer-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - gpu_optimizer_network
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: gpu-optimizer-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - gpu_optimizer_network
+
+# Named volumes for data persistence
+volumes:
+  gpu_optimizer_data:
+    driver: local
+  gpu_optimizer_logs:
+    driver: local
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  nginx_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# Custom network
+networks:
+  gpu_optimizer_network:
+    driver: bridge
+

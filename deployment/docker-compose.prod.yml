@@ -1,0 +1,203 @@
+version: '3.8'
+
+services:
+  # Main application
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: gpuoptimizer-app
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://gpuopt:${DB_PASSWORD}@db:5432/gpuoptimizer
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - FLUTTERWAVE_SECRET_KEY=${FLUTTERWAVE_SECRET_KEY}
+      - FLUTTERWAVE_PUBLIC_KEY=${FLUTTERWAVE_PUBLIC_KEY}
+      - NOWPAYMENTS_API_KEY=${NOWPAYMENTS_API_KEY}
+      - NOWPAYMENTS_IPN_SECRET=${NOWPAYMENTS_IPN_SECRET}
+      - SENDER_EMAIL=${SENDER_EMAIL}
+      - SENDER_PASSWORD=${SENDER_PASSWORD}
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - app_data:/app/data
+      - app_logs:/app/logs
+    depends_on:
+      - db
+      - redis
+    networks:
+      - gpuoptimizer-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gpuoptimizer.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.gpuoptimizer.tls=true"
+      - "traefik.http.routers.gpuoptimizer.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gpuoptimizer.loadbalancer.server.port=5000"
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: gpuoptimizer-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=gpuoptimizer
+      - POSTGRES_USER=gpuopt
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - gpuoptimizer-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gpuopt -d gpuoptimizer"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: gpuoptimizer-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - gpuoptimizer-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Reverse Proxy & SSL
+  traefik:
+    image: traefik:v3.0
+    container_name: gpuoptimizer-traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--global.checknewversion=false"
+      - "--global.sendanonymoususage=false"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt_data:/letsencrypt
+    networks:
+      - gpuoptimizer-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik.service=api@internal"
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: gpuoptimizer-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - gpuoptimizer-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+
+  # Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: gpuoptimizer-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - gpuoptimizer-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+
+  # Log Management
+  loki:
+    image: grafana/loki:latest
+    container_name: gpuoptimizer-loki
+    restart: unless-stopped
+    volumes:
+      - ./loki.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - gpuoptimizer-network
+
+  # Log Collector
+  promtail:
+    image: grafana/promtail:latest
+    container_name: gpuoptimizer-promtail
+    restart: unless-stopped
+    volumes:
+      - ./promtail.yml:/etc/promtail/config.yml
+      - /var/log:/var/log:ro
+      - app_logs:/app/logs:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - gpuoptimizer-network
+
+  # Backup Service
+  backup:
+    image: postgres:15-alpine
+    container_name: gpuoptimizer-backup
+    restart: "no"
+    environment:
+      - PGPASSWORD=${DB_PASSWORD}
+    volumes:
+      - backup_data:/backup
+      - ./backup.sh:/backup.sh
+    command: /bin/sh -c "chmod +x /backup.sh && /backup.sh"
+    depends_on:
+      - db
+    networks:
+      - gpuoptimizer-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_data:
+  app_logs:
+  letsencrypt_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  backup_data:
+
+networks:
+  gpuoptimizer-network:
+    driver: bridge

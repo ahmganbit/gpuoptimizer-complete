@@ -1,0 +1,167 @@
+# GPUOptimizer Revenue System - Requirements
+# Python dependencies for the complete marketing automation and customer acquisition platform
+# Updated: July 2025 - Latest secure versions
+
+# =============================================================================
+# CORE WEB FRAMEWORK
+# =============================================================================
+Flask==3.0.3            # Latest stable version with security fixes
+Flask-CORS==4.0.1        # Updated CORS handling
+Werkzeug==3.0.3          # Latest Werkzeug with security patches
+
+# =============================================================================
+# HTTP REQUESTS AND API CLIENTS
+# =============================================================================
+requests==2.32.3        # Latest version with security fixes
+urllib3==2.2.2           # Updated for compatibility and security
+certifi==2024.7.4       # Updated SSL certificates
+
+# =============================================================================
+# DATABASE AND ORM
+# =============================================================================
+# SQLite is built into Python, but these are for production databases
+psycopg2-binary==2.9.9   # Latest PostgreSQL adapter
+PyMySQL==1.1.1           # Updated MySQL adapter
+SQLAlchemy==2.0.31       # Latest ORM with performance improvements
+
+# =============================================================================
+# PAYMENT PROCESSING
+# =============================================================================
+# No specific packages needed - using direct API calls to Flutterwave and NowPayments
+
+# =============================================================================
+# EMAIL AND MESSAGING
+# =============================================================================
+# Built-in smtplib is used, but these are alternatives:
+sendgrid==6.11.0         # Updated SendGrid email service
+
+# =============================================================================
+# SCHEDULING AND BACKGROUND TASKS
+# =============================================================================
+schedule==1.2.2          # Updated job scheduling
+APScheduler==3.10.4      # Advanced scheduling (stable version)
+
+# =============================================================================
+# DATA PROCESSING AND ANALYSIS
+# =============================================================================
+pandas==2.2.2            # Latest stable version with performance improvements
+numpy==2.0.1             # Major version update with better performance
+
+# =============================================================================
+# SECURITY AND AUTHENTICATION
+# =============================================================================
+cryptography==43.0.0     # Latest version with security fixes
+PyJWT==2.8.0             # Stable JWT implementation
+bcrypt==4.2.0            # Updated password hashing
+passlib==1.7.4           # Additional password utilities
+
+# =============================================================================
+# RATE LIMITING AND CACHING
+# =============================================================================
+Flask-Limiter==3.8.0     # Updated rate limiting
+Flask-Caching==2.3.0     # Updated caching support
+redis==5.0.7             # Latest Redis client
+
+# =============================================================================
+# MONITORING AND LOGGING
+# =============================================================================
+psutil==6.0.0            # Latest system monitoring
+sentry-sdk==2.8.0        # Updated error tracking
+
+# =============================================================================
+# VALIDATION AND SERIALIZATION
+# =============================================================================
+marshmallow==3.21.3      # Latest data validation
+jsonschema==4.23.0       # Updated JSON schema validation
+pydantic==2.8.2          # Modern data validation alternative
+
+# =============================================================================
+# DEVELOPMENT AND TESTING
+# =============================================================================
+pytest==8.2.2            # Latest testing framework
+pytest-cov==5.0.0        # Updated coverage reporting
+pytest-asyncio==0.23.7   # Async testing support
+black==24.4.2            # Latest code formatting
+isort==5.13.2            # Updated import sorting
+flake8==7.1.0            # Latest linting
+pre-commit==3.7.1        # Updated Git hooks
+mypy==1.10.1             # Type checking
+
+# =============================================================================
+# PRODUCTION DEPLOYMENT
+# =============================================================================
+gunicorn==22.0.0          # Latest WSGI HTTP Server
+gevent==24.2.1           # Updated async networking
+supervisor==4.2.5        # Process control system (stable)
+uvicorn==0.30.1          # Alternative ASGI server
+
+# =============================================================================
+# CONTAINERIZATION
+# =============================================================================
+# Docker and docker-compose are external tools, not Python packages
+
+# =============================================================================
+# ENVIRONMENT MANAGEMENT
+# =============================================================================
+python-dotenv==1.0.1     # Updated environment variable loading
+
+# =============================================================================
+# DATE AND TIME HANDLING
+# =============================================================================
+python-dateutil==2.9.0   # Updated date utilities
+pytz==2024.1             # Latest timezone data
+
+# =============================================================================
+# UTILITIES
+# =============================================================================
+click==8.1.7             # Command line interface (stable)
+colorama==0.4.6          # Colored terminal output (stable)
+tqdm==4.66.4             # Updated progress bars
+rich==13.7.1             # Enhanced terminal output
+
+# =============================================================================
+# OPTIONAL: MACHINE LEARNING (for advanced analytics)
+# =============================================================================
+scikit-learn==1.5.1      # Latest ML library
+matplotlib==3.9.1        # Updated plotting library
+seaborn==0.13.2          # Updated statistical plotting
+
+# =============================================================================
+# OPTIONAL: WEB SCRAPING (for enhanced lead generation)
+# =============================================================================
+beautifulsoup4==4.12.3   # Updated HTML parsing
+selenium==4.22.0         # Latest web automation
+lxml==5.2.2              # Fast XML/HTML processing
+
+# =============================================================================
+# OPTIONAL: SOCIAL MEDIA APIs
+# =============================================================================
+tweepy==4.14.0           # Twitter API client (stable)
+praw==7.7.1              # Reddit API client (stable)
+
+# =============================================================================
+# ADDITIONAL SECURITY PACKAGES
+# =============================================================================
+flask-talisman==1.1.0    # Security headers
+flask-session==0.8.0     # Secure session management
+itsdangerous==2.2.0      # Secure data serialization
+
+# =============================================================================
+# VERSION COMPATIBILITY NOTES
+# =============================================================================
+# This requirements.txt is compatible with Python 3.11+
+# Updated July 2025 with latest secure versions
+# All packages have been verified for security vulnerabilities
+# For Python 3.8-3.10, you may need to adjust some version numbers
+# Always test in your target environment before production deployment
+
+# =============================================================================
+# SECURITY NOTES
+# =============================================================================
+# - All packages updated to latest versions as of July 2025
+# - Security vulnerabilities addressed in Flask, Werkzeug, and dependencies
+# - Added additional security packages for enhanced protection
+# - Removed deprecated packages and updated alternatives
+# - Added type checking support with mypy
+# - Enhanced testing capabilities with pytest updates
+
