@@ -5,10 +5,14 @@ set -o errexit  # exit on error
 
 echo "🚀 Starting GPUOptimizer build process..."
 
-# Install Python dependencies
+# Check Python version
+echo "🐍 Python version:"
+python --version
+
+# Install Python dependencies (using simplified requirements)
 echo "📦 Installing Python dependencies..."
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements-render.txt
 
 # Create necessary directories
 echo "📁 Creating directories..."

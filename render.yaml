@@ -3,7 +3,10 @@ services:
     name: gpuoptimizer
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      python --version
+      pip install --upgrade pip
+      pip install -r requirements-render.txt
     startCommand: python gpu_optimizer_system.py
     healthCheckPath: /api/health
     envVars:
