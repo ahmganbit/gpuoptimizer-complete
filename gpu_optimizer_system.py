@@ -1263,12 +1263,12 @@ Talisman(app,
              'connect-src': "'self' https://api.flutterwave.com https://api.nowpayments.io"
          })
 
-# Rate limiting
+# Rate limiting (simplified for deployment)
 limiter = Limiter(
-    app,
+    app=app,
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri=SECURITY_CONFIG['RATE_LIMIT_STORAGE_URL']
+    storage_uri="memory://"
 )
 
 revenue_manager = RevenueManager()
