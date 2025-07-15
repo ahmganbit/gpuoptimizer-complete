@@ -375,7 +375,7 @@ class RevenueManager:
             with self.db_pool.get_connection() as conn:
                 cursor = conn.cursor()
 
-            cursor.execute('''
+                cursor.execute('''
         CREATE TABLE IF NOT EXISTS customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
@@ -390,86 +390,86 @@ class RevenueManager:
         )
         ''')
         
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS revenue_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            customer_email TEXT,
-            event_type TEXT,  -- 'signup', 'upgrade', 'payment', 'churn'
-            amount REAL DEFAULT 0.0,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            metadata TEXT
-        )
-        ''')
-        
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS gpu_usage_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            customer_email TEXT,
-            gpu_index INTEGER,
-            gpu_name TEXT,
-            gpu_util REAL,
-            mem_used REAL,
-            mem_total REAL,
-            cost_per_hour REAL,
-            potential_savings REAL,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
-        
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS payment_transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            customer_email TEXT,
-            payment_id TEXT UNIQUE,
-            payment_gateway TEXT,  -- 'flutterwave' or 'nowpayments'
-            amount REAL,
-            currency TEXT,
-            status TEXT,  -- 'pending', 'completed', 'failed'
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            metadata TEXT
-        )
-        ''')
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS revenue_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    customer_email TEXT,
+                    event_type TEXT,  -- 'signup', 'upgrade', 'payment', 'churn'
+                    amount REAL DEFAULT 0.0,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    metadata TEXT
+                )
+                ''')
 
-        # Security-related tables
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS security_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            event_type TEXT NOT NULL,  -- 'login_attempt', 'api_abuse', 'suspicious_activity'
-            ip_address TEXT,
-            user_agent TEXT,
-            customer_email TEXT,
-            details TEXT,
-            severity TEXT DEFAULT 'info',  -- 'info', 'warning', 'critical'
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS gpu_usage_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    customer_email TEXT,
+                    gpu_index INTEGER,
+                    gpu_name TEXT,
+                    gpu_util REAL,
+                    mem_used REAL,
+                    mem_total REAL,
+                    cost_per_hour REAL,
+                    potential_savings REAL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                ''')
 
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS api_usage_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            customer_email TEXT,
-            api_key TEXT,
-            endpoint TEXT,
-            method TEXT,
-            ip_address TEXT,
-            user_agent TEXT,
-            response_status INTEGER,
-            response_time REAL,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS payment_transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    customer_email TEXT,
+                    payment_id TEXT UNIQUE,
+                    payment_gateway TEXT,  -- 'flutterwave' or 'nowpayments'
+                    amount REAL,
+                    currency TEXT,
+                    status TEXT,  -- 'pending', 'completed', 'failed'
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    metadata TEXT
+                )
+                ''')
 
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS blocked_ips (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ip_address TEXT UNIQUE NOT NULL,
-            reason TEXT,
-            blocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            expires_at TIMESTAMP,
-            is_active BOOLEAN DEFAULT 1
-        )
-        ''')
+                # Security-related tables
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS security_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,  -- 'login_attempt', 'api_abuse', 'suspicious_activity'
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    customer_email TEXT,
+                    details TEXT,
+                    severity TEXT DEFAULT 'info',  -- 'info', 'warning', 'critical'
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                ''')
+
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS api_usage_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    customer_email TEXT,
+                    api_key TEXT,
+                    endpoint TEXT,
+                    method TEXT,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    response_status INTEGER,
+                    response_time REAL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                ''')
+
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS blocked_ips (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ip_address TEXT UNIQUE NOT NULL,
+                    reason TEXT,
+                    blocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP,
+                    is_active BOOLEAN DEFAULT 1
+                )
+                ''')
 
                 conn.commit()
 
