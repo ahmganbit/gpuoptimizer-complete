@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: gpuoptimizer
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python gpu_optimizer_system.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.18
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000

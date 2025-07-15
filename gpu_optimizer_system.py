@@ -28,6 +28,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
 from dataclasses import dataclass
+from global_payment_system import GlobalPaymentSystem
 import hmac
 from marshmallow import Schema, fields, validate, ValidationError
 from cryptography.fernet import Fernet
@@ -161,7 +162,7 @@ class GPUDataSchema(Schema):
 class PaymentSchema(Schema):
     customer_email = fields.Email(required=True)
     tier = fields.String(required=True, validate=validate.OneOf(['professional', 'enterprise']))
-    payment_method = fields.String(required=True, validate=validate.OneOf(['flutterwave', 'nowpayments']))
+    payment_method = fields.String(required=True, validate=validate.OneOf(['nowpayments', 'flutterwave', 'paddle', 'auto']))
 
 # Security utilities
 class SecurityUtils:
@@ -294,15 +295,12 @@ class RevenueManager:
         self.failed_attempts = {}  # Track failed login attempts
         self.rate_limits = {}  # Track rate limiting
 
-        # Flutterwave configuration (encrypted storage)
-        self.flutterwave_secret_key = os.getenv('FLUTTERWAVE_SECRET_KEY', 'FLWSECK_TEST-...')
-        self.flutterwave_public_key = os.getenv('FLUTTERWAVE_PUBLIC_KEY', 'FLWPUBK_TEST-...')
-        self.flutterwave_base_url = "https://api.flutterwave.com/v3"
+        # Initialize global payment system (replaces Stripe/Flutterwave)
+        self.payment_system = GlobalPaymentSystem()
 
-        # NowPayments configuration (encrypted storage)
-        self.nowpayments_api_key = os.getenv('NOWPAYMENTS_API_KEY', 'your_nowpayments_api_key')
-        self.nowpayments_ipn_secret = os.getenv('NOWPAYMENTS_IPN_SECRET', 'your_ipn_secret')
-        self.nowpayments_base_url = "https://api.nowpayments.io/v1"
+        # Legacy payment configurations (for backward compatibility)
+        self.flutterwave_secret_key = os.getenv('FLUTTERWAVE_SECRET_KEY')
+        self.nowpayments_api_key = os.getenv('NOWPAYMENTS_API_KEY')
 
         # Pricing tiers with enhanced security
         self.pricing = {
@@ -729,18 +727,80 @@ class RevenueManager:
         conn.commit()
         conn.close()
     
-    def upgrade_customer(self, email: str, new_tier: str, payment_method: str = 'flutterwave') -> Dict:
-        """Upgrade customer to paid tier"""
+    def create_global_payment(self, customer_email: str, amount: float, plan: str,
+                            currency: str = "USD", gateway: str = None, country_code: str = None) -> Dict:
+        """Create payment using global payment system"""
+        try:
+            customer = self.get_customer(customer_email)
+            if not customer:
+                return {'error': 'Customer not found'}
+
+            # Use global payment system
+            result = self.payment_system.create_payment(
+                amount=amount,
+                currency=currency,
+                plan=plan,
+                customer_email=customer_email,
+                gateway=gateway,
+                country_code=country_code
+            )
+
+            if result.success:
+                # Store payment transaction
+                self.store_payment_transaction(
+                    customer_email=customer_email,
+                    payment_id=result.transaction_id,
+                    payment_gateway=result.gateway,
+                    amount=result.amount,
+                    currency=result.currency,
+                    status=result.status,
+                    metadata=json.dumps({
+                        'plan': plan,
+                        'gateway': result.gateway,
+                        'payment_url': result.payment_url
+                    })
+                )
+
+                return {
+                    'status': 'success',
+                    'payment_id': result.transaction_id,
+                    'payment_url': result.payment_url,
+                    'gateway': result.gateway,
+                    'amount': result.amount,
+                    'currency': result.currency,
+                    'message': result.message
+                }
+            else:
+                return {
+                    'status': 'error',
+                    'error': result.message,
+                    'gateway': result.gateway
+                }
+
+        except Exception as e:
+            logging.error(f"Global payment creation failed: {e}")
+            return {'error': f'Payment creation failed: {str(e)}'}
+
+    def upgrade_customer(self, email: str, new_tier: str, payment_method: str = 'auto', country_code: str = None) -> Dict:
+        """Upgrade customer to paid tier using global payment system"""
         customer = self.get_customer(email)
         if not customer:
             return {'error': 'Customer not found'}
-        
+
         amount = self.pricing[new_tier]['price']
-        
-        if payment_method == 'flutterwave':
+
+        # Use global payment system for new payments
+        if payment_method in ['auto', 'nowpayments', 'paypal', 'paddle', 'razorpay']:
+            return self.create_global_payment(
+                customer_email=email,
+                amount=amount,
+                plan=new_tier,
+                gateway=None if payment_method == 'auto' else payment_method,
+                country_code=country_code
+            )
+        # Legacy support for old payment methods
+        elif payment_method == 'flutterwave':
             return self.create_flutterwave_payment(email, amount)
-        elif payment_method == 'nowpayments':
-            return self.create_nowpayments_payment(email, amount)
         else:
             return {'error': 'Invalid payment method'}
     
@@ -1368,27 +1428,89 @@ def signup():
         )
         return jsonify({'status': 'error', 'message': 'Internal server error'}), 500
 
+@app.route('/api/payment/gateways', methods=['GET'])
+def get_payment_gateways():
+    """Get available payment gateways for a country"""
+    try:
+        country_code = request.args.get('country')
+        gateways = revenue_manager.payment_system.get_available_gateways(country_code)
+
+        return jsonify({
+            'status': 'success',
+            'gateways': gateways,
+            'recommended': gateways[0] if gateways else None,
+            'message': f'Found {len(gateways)} available payment methods'
+        })
+
+    except Exception as e:
+        logging.error(f"Gateway listing error: {e}")
+        return jsonify({'status': 'error', 'message': 'Failed to get payment gateways'}), 500
+
+@app.route('/api/payment/create', methods=['POST'])
+@limiter.limit("5 per minute")
+def create_payment():
+    """Create payment using global payment system"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'status': 'error', 'message': 'No data provided'}), 400
+
+        customer_email = data.get('customer_email')
+        tier = data.get('tier')
+        payment_method = data.get('payment_method', 'auto')
+        country_code = data.get('country_code')
+        currency = data.get('currency', 'USD')
+
+        if not customer_email or not tier:
+            return jsonify({'status': 'error', 'message': 'Email and tier required'}), 400
+
+        if tier not in revenue_manager.pricing:
+            return jsonify({'status': 'error', 'message': 'Invalid tier'}), 400
+
+        # Create payment using global system
+        result = revenue_manager.create_global_payment(
+            customer_email=customer_email,
+            amount=revenue_manager.pricing[tier]['price'],
+            plan=tier,
+            currency=currency,
+            gateway=None if payment_method == 'auto' else payment_method,
+            country_code=country_code
+        )
+
+        return jsonify(result)
+
+    except Exception as e:
+        logging.error(f"Payment creation error: {e}")
+        return jsonify({'status': 'error', 'message': 'Payment creation failed'}), 500
+
 @app.route('/api/upgrade', methods=['POST'])
 @limiter.limit("10 per minute")  # Rate limit upgrade attempts
-@validate_input(PaymentSchema)
 def upgrade():
-    """Handle customer upgrade with enhanced security"""
+    """Handle customer upgrade with enhanced security (legacy endpoint)"""
     try:
-        client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
-        email = g.validated_data['customer_email']
-        tier = g.validated_data['tier']
-        payment_method = g.validated_data['payment_method']
+        data = request.json
+        if not data:
+            return jsonify({'status': 'error', 'message': 'No data provided'}), 400
+
+        email = data.get('customer_email')
+        tier = data.get('tier')
+        payment_method = data.get('payment_method', 'auto')
+        country_code = data.get('country_code')
+
+        if not email or not tier:
+            return jsonify({'status': 'error', 'message': 'Email and tier required'}), 400
 
         # Verify customer exists
         customer = revenue_manager.get_customer_by_email(email)
         if not customer:
             return jsonify({'status': 'error', 'message': 'Customer not found'}), 404
-        
-        result = revenue_manager.upgrade_customer(email, tier, payment_method)
-        
+
+        result = revenue_manager.upgrade_customer(email, tier, payment_method, country_code)
+
         return jsonify(result)
-        
+
     except Exception as e:
+        logging.error(f"Upgrade error: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/track-usage', methods=['POST'])
@@ -1480,6 +1602,32 @@ def nowpayments_webhook():
         print(f"Webhook error: {e}")
         return "Error", 500
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for monitoring"""
+    try:
+        # Check database connection
+        with revenue_manager.db_pool.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT 1')
+            db_status = cursor.fetchone()[0] == 1
+
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'version': '1.0.0',
+            'services': {
+                'database': 'healthy' if db_status else 'unhealthy',
+                'api': 'healthy'
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
     """Get revenue statistics"""
@@ -1490,5 +1638,28 @@ def get_stats():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    print("🚀 Starting GPUOptimizer Revenue System...")
+    print("=" * 50)
+    print("💰 Autonomous revenue generation: ACTIVE")
+    print("🤖 Customer acquisition: RUNNING")
+    print("📊 Analytics tracking: ENABLED")
+    print("🔒 Security monitoring: ACTIVE")
+    print("=" * 50)
+
+    # Production configuration
+    port = int(os.getenv('PORT', 5000))
+    debug_mode = os.getenv('FLASK_ENV') == 'development'
+
+    print(f"🌐 Server starting on port {port}")
+    print(f"🔧 Debug mode: {debug_mode}")
+    print(f"🌍 Environment: {os.getenv('FLASK_ENV', 'development')}")
+    print("=" * 50)
+
+    # Start the Flask application
+    app.run(
+        host='0.0.0.0',
+        port=port,
+        debug=debug_mode,
+        threaded=True
+    )
 

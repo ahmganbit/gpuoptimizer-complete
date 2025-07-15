@@ -25,9 +25,13 @@ PyMySQL==1.1.1           # Updated MySQL adapter
 SQLAlchemy==2.0.31       # Latest ORM with performance improvements
 
 # =============================================================================
-# PAYMENT PROCESSING
+# OPTIMIZED 3-GATEWAY PAYMENT SYSTEM
 # =============================================================================
-# No specific packages needed - using direct API calls to Flutterwave and NowPayments
+# All payment processing done via direct API calls to:
+# - NOWPayments (crypto) - no SDK needed
+# - Flutterwave (traditional) - no SDK needed
+# - Paddle (SaaS billing) - no SDK needed
+# Using requests library for all payment gateway integrations
 
 # =============================================================================
 # EMAIL AND MESSAGING
