@@ -1528,11 +1528,7 @@ def upgrade():
         if not email or not tier:
             return jsonify({'status': 'error', 'message': 'Email and tier required'}), 400
 
-        # Verify customer exists
-        customer = revenue_manager.get_customer_by_email(email)
-        if not customer:
-            return jsonify({'status': 'error', 'message': 'Customer not found'}), 404
-
+        # Let upgrade_customer handle customer lookup and creation
         result = revenue_manager.upgrade_customer(email, tier, payment_method, country_code)
 
         return jsonify(result)
