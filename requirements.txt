@@ -46,10 +46,10 @@ schedule==1.2.2          # Updated job scheduling
 APScheduler==3.10.4      # Advanced scheduling (stable version)
 
 # =============================================================================
-# DATA PROCESSING AND ANALYSIS
+# DATA PROCESSING AND ANALYSIS (OPTIONAL)
 # =============================================================================
-pandas==2.2.2            # Latest stable version with performance improvements
-numpy==2.0.1             # Major version update with better performance
+# pandas==2.2.2          # Removed for faster deployment - add back if needed
+# numpy==2.0.1           # Removed for faster deployment - add back if needed
 
 # =============================================================================
 # SECURITY AND AUTHENTICATION
