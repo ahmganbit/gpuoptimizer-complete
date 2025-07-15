@@ -791,7 +791,13 @@ class RevenueManager:
         """Upgrade customer to paid tier using global payment system"""
         customer = self.get_customer(email)
         if not customer:
-            return {'error': 'Customer not found'}
+            # Try to create customer if not found (handles database consistency issues)
+            try:
+                customer = self.create_customer(email)
+                logging.info(f"Created customer during upgrade: {email}")
+            except Exception as e:
+                logging.error(f"Failed to create customer during upgrade: {e}")
+                return {'error': 'Customer not found and could not be created'}
 
         amount = self.pricing[new_tier]['price']
 
@@ -813,6 +819,14 @@ class RevenueManager:
     def complete_upgrade(self, customer_email: str, new_tier: str, payment_id: str):
         """Complete customer upgrade after successful payment"""
         customer = self.get_customer(customer_email)
+        if not customer:
+            # Try to create customer if not found
+            try:
+                customer = self.create_customer(customer_email)
+                logging.info(f"Created customer during upgrade completion: {customer_email}")
+            except Exception as e:
+                logging.error(f"Failed to create customer during upgrade completion: {e}")
+                return
 
         try:
             with self.db_pool.get_connection() as conn:
