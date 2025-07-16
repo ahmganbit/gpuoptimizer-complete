@@ -502,42 +502,48 @@ class RevenueManager:
             user=email
         )
 
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
         try:
-            cursor.execute('''
-            INSERT INTO customers (email, api_key, tier)
-            VALUES (?, ?, 'free')
-            ''', (email, api_key))
-            
-            # Log signup event
-            cursor.execute('''
-            INSERT INTO revenue_events (customer_email, event_type, metadata)
-            VALUES (?, 'signup', ?)
-            ''', (email, json.dumps({'source': 'landing_page'})))
-            
-            conn.commit()
-            
-            customer = Customer(
-                email=email,
-                tier='free', 
-                api_key=api_key,
-                created_at=datetime.now()
-            )
-            
-            # Send welcome email with setup instructions
-            self.send_onboarding_email(customer)
-            
-            return customer
-            
-        except sqlite3.IntegrityError:
-            # Customer already exists
-            cursor.execute('SELECT * FROM customers WHERE email = ?', (email,))
-            row = cursor.fetchone()
-            return self.row_to_customer(row)
-        finally:
-            conn.close()
+            with self.db_pool.get_connection() as conn:
+                cursor = conn.cursor()
+
+                try:
+                    cursor.execute('''
+                    INSERT INTO customers (email, api_key, tier)
+                    VALUES (?, ?, 'free')
+                    ''', (email, api_key))
+
+                    # Log signup event
+                    cursor.execute('''
+                    INSERT INTO revenue_events (customer_email, event_type, metadata)
+                    VALUES (?, 'signup', ?)
+                    ''', (email, json.dumps({'source': 'landing_page'})))
+
+                    conn.commit()
+
+                    customer = Customer(
+                        email=email,
+                        tier='free',
+                        api_key=api_key,
+                        created_at=datetime.now()
+                    )
+
+                    # Clear cache to ensure fresh lookups
+                    cache_key = f"customer_email_{email}"
+                    self.cache.delete(cache_key)
+
+                    # Send welcome email with setup instructions
+                    self.send_onboarding_email(customer)
+
+                    return customer
+
+                except sqlite3.IntegrityError:
+                    # Customer already exists
+                    cursor.execute('SELECT * FROM customers WHERE email = ?', (email,))
+                    row = cursor.fetchone()
+                    return self.row_to_customer(row)
+        except Exception as e:
+            logging.error(f"Customer creation error: {e}")
+            raise
     
     def create_flutterwave_payment(self, customer_email: str, amount: float, currency: str = "USD") -> Dict:
         """Create a Flutterwave payment"""
@@ -785,7 +791,13 @@ class RevenueManager:
         """Upgrade customer to paid tier using global payment system"""
         customer = self.get_customer(email)
         if not customer:
-            return {'error': 'Customer not found'}
+            # Try to create customer if not found (handles database consistency issues)
+            try:
+                customer = self.create_customer(email)
+                logging.info(f"Created customer during upgrade: {email}")
+            except Exception as e:
+                logging.error(f"Failed to create customer during upgrade: {e}")
+                return {'error': 'Customer not found and could not be created'}
 
         amount = self.pricing[new_tier]['price']
 
@@ -806,27 +818,43 @@ class RevenueManager:
     
     def complete_upgrade(self, customer_email: str, new_tier: str, payment_id: str):
         """Complete customer upgrade after successful payment"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
         customer = self.get_customer(customer_email)
-        
-        # Update customer tier
-        cursor.execute('''
-        UPDATE customers 
-        SET tier = ?, last_payment = CURRENT_TIMESTAMP
-        WHERE email = ?
-        ''', (new_tier, customer_email))
-        
-        # Log upgrade event
-        cursor.execute('''
-        INSERT INTO revenue_events (customer_email, event_type, amount, metadata)
-        VALUES (?, 'upgrade', ?, ?)
-        ''', (customer_email, self.pricing[new_tier]['price'], 
-              json.dumps({'from_tier': customer.tier, 'to_tier': new_tier, 'payment_id': payment_id})))
-        
-        conn.commit()
-        conn.close()
+        if not customer:
+            # Try to create customer if not found
+            try:
+                customer = self.create_customer(customer_email)
+                logging.info(f"Created customer during upgrade completion: {customer_email}")
+            except Exception as e:
+                logging.error(f"Failed to create customer during upgrade completion: {e}")
+                return
+
+        try:
+            with self.db_pool.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Update customer tier
+                cursor.execute('''
+                UPDATE customers
+                SET tier = ?, last_payment = CURRENT_TIMESTAMP
+                WHERE email = ?
+                ''', (new_tier, customer_email))
+
+                # Log upgrade event
+                cursor.execute('''
+                INSERT INTO revenue_events (customer_email, event_type, amount, metadata)
+                VALUES (?, 'upgrade', ?, ?)
+                ''', (customer_email, self.pricing[new_tier]['price'],
+                      json.dumps({'from_tier': customer.tier, 'to_tier': new_tier, 'payment_id': payment_id})))
+
+                conn.commit()
+
+                # Clear cache to ensure fresh lookups
+                cache_key = f"customer_email_{customer_email}"
+                self.cache.delete(cache_key)
+
+        except Exception as e:
+            logging.error(f"Upgrade completion error: {e}")
+            raise
         
         # Send upgrade confirmation email
         self.send_upgrade_email(customer_email, new_tier)
@@ -1505,11 +1533,7 @@ def upgrade():
         if not email or not tier:
             return jsonify({'status': 'error', 'message': 'Email and tier required'}), 400
 
-        # Verify customer exists
-        customer = revenue_manager.get_customer_by_email(email)
-        if not customer:
-            return jsonify({'status': 'error', 'message': 'Customer not found'}), 404
-
+        # Let upgrade_customer handle customer lookup and creation
         result = revenue_manager.upgrade_customer(email, tier, payment_method, country_code)
 
         return jsonify(result)
