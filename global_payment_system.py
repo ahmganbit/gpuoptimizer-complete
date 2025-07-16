@@ -108,9 +108,24 @@ class GlobalPaymentSystem:
                     'recommended': gateway_id in ['nowpayments', 'paypal']
                 })
         
+        # If no gateways are available, add demo mode
+        if not available:
+            logger.warning("No payment gateways configured - adding demo gateway")
+            available.append({
+                'id': 'demo',
+                'name': 'Demo Payment (Testing)',
+                'currencies': ['USD', 'EUR', 'GBP'],
+                'fees': '0% (Demo)',
+                'recommended': True
+            })
+
         # Sort by preference (crypto first, then PayPal)
-        available.sort(key=lambda x: ['nowpayments', 'paypal', 'paddle', 'razorpay', 'flutterwave'].index(x['id']))
-        
+        try:
+            available.sort(key=lambda x: ['nowpayments', 'paypal', 'paddle', 'razorpay', 'flutterwave', 'demo'].index(x['id']))
+        except ValueError:
+            # If gateway not in list, keep original order
+            pass
+
         return available
     
     def create_payment(self, amount: float, currency: str, plan: str, 
@@ -137,6 +152,8 @@ class GlobalPaymentSystem:
                 return self._create_razorpay_payment(amount, currency, plan, customer_email)
             elif gateway == 'flutterwave':
                 return self._create_flutterwave_payment(amount, currency, plan, customer_email)
+            elif gateway == 'demo':
+                return self._create_demo_payment(amount, currency, plan, customer_email)
             else:
                 raise ValueError(f"Unsupported gateway: {gateway}")
                 
@@ -182,21 +199,32 @@ class GlobalPaymentSystem:
         if self._is_gateway_configured('paddle'):
             return 'paddle'
 
-        raise ValueError("No payment gateways configured")
+        # If no gateways configured, return demo mode
+        logger.warning("No payment gateways configured - returning demo gateway")
+        return 'demo'
     
     def _is_gateway_configured(self, gateway_id: str) -> bool:
         """Check if a gateway is properly configured"""
         gateway = self.primary_gateways.get(gateway_id)
         if not gateway:
             return False
-        
+
         if gateway_id == 'nowpayments':
-            return bool(gateway['api_key'])
+            configured = bool(gateway['api_key'])
+            if not configured:
+                logger.warning(f"NOWPayments not configured - missing NOWPAYMENTS_API_KEY")
+            return configured
         elif gateway_id == 'flutterwave':
-            return bool(gateway['secret_key'])
+            configured = bool(gateway['secret_key'])
+            if not configured:
+                logger.warning(f"Flutterwave not configured - missing FLUTTERWAVE_SECRET_KEY")
+            return configured
         elif gateway_id == 'paddle':
-            return bool(gateway['vendor_id'] and gateway['vendor_auth_code'])
-        
+            configured = bool(gateway['vendor_id'] and gateway['vendor_auth_code'])
+            if not configured:
+                logger.warning(f"Paddle not configured - missing PADDLE_VENDOR_ID or PADDLE_VENDOR_AUTH_CODE")
+            return configured
+
         return False
     
     # =============================================================================
@@ -394,3 +422,37 @@ class GlobalPaymentSystem:
         except Exception as e:
             logger.error(f"NOWPayments status check failed: {e}")
             return {'status': 'unknown', 'error': str(e)}
+
+    # =============================================================================
+    # DEMO PAYMENT SYSTEM (FOR TESTING)
+    # =============================================================================
+
+    def _create_demo_payment(self, amount: float, currency: str, plan: str, customer_email: str) -> PaymentResult:
+        """Create demo payment for testing when no gateways are configured"""
+        try:
+            transaction_id = f"demo_{uuid.uuid4().hex[:12]}"
+
+            logger.info(f"Demo payment created: {transaction_id} for {customer_email}")
+
+            return PaymentResult(
+                success=True,
+                transaction_id=transaction_id,
+                amount=amount,
+                currency=currency,
+                gateway='demo',
+                status='pending',
+                message='Demo payment created - this is for testing only',
+                payment_url=f"https://demo-payment.gpuoptimizer.com/pay/{transaction_id}"
+            )
+
+        except Exception as e:
+            logger.error(f"Demo payment creation failed: {e}")
+            return PaymentResult(
+                success=False,
+                transaction_id=None,
+                amount=amount,
+                currency=currency,
+                gateway='demo',
+                status='failed',
+                message=f"Demo payment failed: {str(e)}"
+            )

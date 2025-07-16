@@ -1172,26 +1172,31 @@ class RevenueManager:
         sender_password = os.getenv('SENDER_PASSWORD', '')
         
         if not sender_password:
-            print(f"Would send email to {to_email}: {subject}")
+            logging.warning(f"Email credentials not configured. Would send email to {to_email}: {subject}")
+            print(f"📧 Would send email to {to_email}: {subject}")
+            print(f"📝 Email body preview: {body[:200]}...")
+            print("⚠️  To enable email sending, set SENDER_EMAIL and SENDER_PASSWORD environment variables")
             return
         
         try:
             msg = MIMEMultipart()
-            msg['From'] = self.sender_email
+            msg['From'] = sender_email
             msg['To'] = to_email
             msg['Subject'] = subject
-            
+
             msg.attach(MIMEText(body, 'plain'))
-            
+
             server = smtplib.SMTP(smtp_server, smtp_port)
             server.starttls()
             server.login(sender_email, sender_password)
             server.send_message(msg)
             server.quit()
-            
-            print(f"Email sent to {to_email}")
+
+            logging.info(f"Email sent successfully to {to_email}")
+            print(f"✅ Email sent to {to_email}")
         except Exception as e:
-            print(f"Failed to send email: {e}")
+            logging.error(f"Failed to send email to {to_email}: {e}")
+            print(f"❌ Failed to send email: {e}")
     
     def get_revenue_stats(self) -> Dict:
         """Get revenue statistics"""
